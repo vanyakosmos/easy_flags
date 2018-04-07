@@ -1,4 +1,4 @@
-from .main import BaseConfig
+from .base import BaseConfig
 
 
 __all__ = [

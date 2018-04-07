@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='easy_flags',
-    version='0.1.0',
+    version='0.1.1',
     packages=['easy_flags'],
     url='https://github.com/vaniakosmos/easy_flags',
     license='MIT',
