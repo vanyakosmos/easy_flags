@@ -12,6 +12,7 @@ class BaseConfig(object):
         self._attrs = [a for a in dir(self)
                        if not a.startswith('_')
                        and not callable(getattr(self, a))]
+        self._resolvers = self._get_resolvers_map()
         self._define_map = {
             str: self._define_str,
             int: self._define_int,
@@ -39,8 +40,8 @@ class BaseConfig(object):
                 self._call_definer(attr, typ, value)
 
         self._args = self._parser.parse_args()
+        self._defined = True  # check `defined` flag before fill() in order to escape recursion calls
         self.fill_attributes(self)
-        self._defined = True
 
     def fill_attributes(self, obj):
         """
@@ -49,7 +50,10 @@ class BaseConfig(object):
         if not self._defined:
             self.define()
         for a in self._attrs:
-            setattr(obj, a, getattr(self._args, a))
+            value = getattr(self._args, a)
+            if a in self._resolvers:
+                value = self._resolvers[a](value)
+            setattr(obj, a, value)
 
     def print(self, title=None, block_size=39, prefix='|  '):
         """
@@ -66,6 +70,18 @@ class BaseConfig(object):
             value = getattr(self, a)
             print(f'{prefix}{key} : {value}')
         print('+ ' + '- ' * block_size)
+
+    def _get_resolvers_map(self):
+        attrs_set = set(self._attrs)
+        resolve_prefix = 'resolve_'
+        resolve_cut = len(resolve_prefix)
+        return {
+            a[resolve_cut:]: getattr(self, a)
+            for a in dir(self)
+            if a.startswith('resolve_')
+               and a[resolve_cut:] in attrs_set
+               and callable(getattr(self, a))
+        }
 
     def _call_definer(self, attr: str, typ, value, doc=''):
         definer = self._define_map.get(typ, None)
@@ -121,11 +137,16 @@ class BaseConfig(object):
 
 class ExampleConfig(BaseConfig):
     _desc = 'Description for parser. Will be redefined if `desc` is specified for config object.'
-    a = 3
-    b = False
-    h = True
+    # specify type of resolver
+    a = 3  # type: str
+    use_stuff = False
+    no_staff = True
+    g = 5
     c = 'spam', 'field with value and doc string'  # type: str
     ddd = None, int, 'field with value, type and doc string'  # type: int
+
+    def resolve_a(self, value):
+        return str(value * 42)
 
 
 def main():
