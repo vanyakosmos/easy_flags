@@ -1,7 +1,7 @@
 easy_flags
 ==========
 
-The goal of this nano-project is to provide sane alternative for ``tensorflow.flags`` by adding some additional features that ``tensorflow.flags`` currently lacks:
+The goal of this nano-project is to provide sane alternative for ``tensorflow.flags`` and ``argparse`` by adding some additional features that they currently lacks:
 
 #. typechecking
 #. autocompletion
@@ -9,6 +9,14 @@ The goal of this nano-project is to provide sane alternative for ``tensorflow.fl
 #. full config print out
 
 Of course ``easy_flags`` doesn't depend on ``tensorflow`` and can be used w/o it.
+
+
+Installation
+------------
+
+.. code-block:: bash
+
+    pip install easy_flags
 
 
 Basic example
@@ -20,11 +28,13 @@ configs.py
 
     from easy_flags import BaseConfig
 
+    # main config with model parameters
     class ModelConfig(BaseConfig):
         layers = 4
         dropout = 0.4, 'this is docstring for this field'  # type: float
         leaky = True, 'use leaky relu'  # type: bool
-    
+
+    # extend model config with training flags
     class TrainingConfig(ModelConfig):
         lr = 0.001, 'learning rate'  # type: float
         e = 100, 'number of epochs'  # type: int
@@ -49,7 +59,7 @@ train.py
         train(conf.e, conf.lr, conf.layers, conf.dropout, conf.leaky)
 
     if __name__ == "__main__":
-        conf.define()  # read flags from sys.argv and fill `conf` with default or new values
+        conf.define()  # read/parse flags from sys.argv and fill up `conf` with values
         conf.print()  # pretty-print all flags and their values
         main()
 
