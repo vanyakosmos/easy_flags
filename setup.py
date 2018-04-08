@@ -1,15 +1,21 @@
 from setuptools import setup
 
 
+def readme():
+    with open('README.rst') as f:
+        return f.read()
+
+
 setup(
     name='easy_flags',
-    version='0.1.1',
+    version='0.1.2',
     packages=['easy_flags'],
     url='https://github.com/vaniakosmos/easy_flags',
     license='MIT',
     author='Bachynin Ivan',
     author_email='bachynin.i@gmail.com',
     description='Simplified flags definition.',
+    long_description=readme(),
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
