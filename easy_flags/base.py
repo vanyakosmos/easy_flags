@@ -1,6 +1,9 @@
 import argparse
 
 
+FLAGS = None
+
+
 class ConfigurationError(Exception):
     pass
 
@@ -31,22 +34,18 @@ class BaseConfig(object):
         """
         if self._defined:
             return
-        for attr in self._attrs:
-            value = getattr(self, attr)
-            typ = type(value)
-            if typ is tuple or typ is list:
-                self._manage_tuple(attr, value)
-            else:
-                self._call_definer(attr, typ, value)
+        self._setup_arguments()
+        self._parse_arguments()
+        self.fill_attributes()
+        global FLAGS
+        FLAGS = self
 
-        self._args = self._parser.parse_args()
-        self._defined = True  # check `defined` flag before fill() in order to escape recursion calls
-        self.fill_attributes(self)
-
-    def fill_attributes(self, obj):
+    def fill_attributes(self, obj=None):
         """
         Fill `obj` with defined attributes.
         """
+        if obj is None:
+            obj = self
         if not self._defined:
             self.define()
         for a in self._attrs:
@@ -72,6 +71,19 @@ class BaseConfig(object):
             print(f'{prefix}{key} : {r}')
         print('+ ' + '- ' * block_size)
 
+    def _setup_arguments(self):
+        for attr in self._attrs:
+            value = getattr(self, attr)
+            typ = type(value)
+            if typ is tuple or typ is list:
+                self._manage_tuple(attr, value)
+            else:
+                self._call_definer(attr, typ, value)
+
+    def _parse_arguments(self, args=None):
+        self._args = self._parser.parse_args(args)
+        self._defined = True  # check `defined` flag before fill() in order to escape recursion calls
+
     def _get_resolvers_map(self):
         attrs_set = set(self._attrs)
         resolve_prefix = 'resolve_'
@@ -91,23 +103,38 @@ class BaseConfig(object):
                                      "Should be primitive type.".format(attr))
         definer(attr, value, doc)
 
-    def _define_str(self, attr, value, doc=None):
-        doc = doc or 'string field'
+    def _define_str(self, attr, value, doc=''):
+        doc = 'String field, default={}. {}'.format(repr(value), doc).strip()
         self._define_arg(attr, str, value, doc)
 
-    def _define_int(self, attr, value, doc=None):
-        doc = doc or 'int field'
+    def _define_int(self, attr, value, doc=''):
+        doc = 'Integer field, default={}. {}'.format(repr(value), doc).strip()
         self._define_arg(attr, int, value, doc)
 
-    def _define_float(self, attr, value, doc=None):
-        doc = doc or 'float field'
+    def _define_float(self, attr, value, doc=''):
+        doc = 'Float field, default={}. {}'.format(repr(value), doc).strip()
         self._define_arg(attr, float, value, doc)
 
-    def _define_bool(self, attr, value, doc=None):
-        doc = doc or 'boolean flag'
+    def _attr_name_tuple(self, attr):
+        """
+        >>> self._attr_name_tuple('a')
+        ('-a', '--a')
+
+        >>> self._attr_name_tuple('aa')
+        ('--a',)
+        """
+        if len(attr) > 1:
+            return ('--' + attr,)
+        else:
+            return ('-' + attr, '--' + attr)
+
+    def _define_bool(self, attr, value, doc=''):
+        doc = 'Boolean flag, default={}. {}'.format(repr(value), doc).strip()
         feature_parser = self._parser.add_mutually_exclusive_group(required=False)
-        feature_parser.add_argument('--' + attr, dest=attr, action='store_true', help=doc)
-        feature_parser.add_argument('--no-' + attr, dest=attr, action='store_false')
+        attr_name = self._attr_name_tuple(attr)
+        feature_parser.add_argument(*attr_name, dest=attr, action='store_true', help=doc)
+        attr_name = self._attr_name_tuple('no-' + attr)
+        feature_parser.add_argument(*attr_name, dest=attr, action='store_false')
         self._parser.set_defaults(**{attr: value})
 
     def _manage_tuple(self, attr, value):
@@ -134,8 +161,8 @@ class BaseConfig(object):
         }
         if action and action.startswith('store'):
             params.pop('type')
-        dash = '-' * min(2, len(attr))
-        self._parser.add_argument(dash + attr, **params)
+        attr_name = self._attr_name_tuple(attr)
+        self._parser.add_argument(*attr_name, **params)
 
 
 class ExampleConfig(BaseConfig):
@@ -143,6 +170,7 @@ class ExampleConfig(BaseConfig):
     # specify type of resolver
     a = 3  # type: str
     cache = True
+    d = False
     g = 5
     c = 'spam', 'field with value and doc string'  # type: str
     ddd = None, int, 'field with value, type and doc string'  # type: int
