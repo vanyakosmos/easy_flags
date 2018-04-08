@@ -68,7 +68,8 @@ class BaseConfig(object):
         for a in self._attrs:
             key = a.ljust(max_len)
             value = getattr(self, a)
-            print(f'{prefix}{key} : {value}')
+            r = repr(value)
+            print(f'{prefix}{key} : {r}')
         print('+ ' + '- ' * block_size)
 
     def _get_resolvers_map(self):
@@ -104,8 +105,10 @@ class BaseConfig(object):
 
     def _define_bool(self, attr, value, doc=None):
         doc = doc or 'boolean flag'
-        action = 'store_false' if value else 'store_true'
-        self._define_arg(attr, str, value, doc, action=action)
+        feature_parser = self._parser.add_mutually_exclusive_group(required=False)
+        feature_parser.add_argument('--' + attr, dest=attr, action='store_true', help=doc)
+        feature_parser.add_argument('--no-' + attr, dest=attr, action='store_false')
+        self._parser.set_defaults(**{attr: value})
 
     def _manage_tuple(self, attr, value):
         err_msg = "Bad definition for field '{0}'. Tuple must have one of the next formats: " \
@@ -139,8 +142,7 @@ class ExampleConfig(BaseConfig):
     _desc = 'Description for parser. Will be redefined if `desc` is specified for config object.'
     # specify type of resolver
     a = 3  # type: str
-    use_stuff = False
-    no_staff = True
+    cache = True
     g = 5
     c = 'spam', 'field with value and doc string'  # type: str
     ddd = None, int, 'field with value, type and doc string'  # type: int
