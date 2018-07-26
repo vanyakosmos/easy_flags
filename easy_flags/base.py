@@ -1,9 +1,6 @@
 import argparse
 
 
-FLAGS = None
-
-
 class ConfigurationError(Exception):
     pass
 
@@ -37,8 +34,7 @@ class BaseConfig(object):
         self._setup_arguments()
         self._parse_arguments()
         self.fill_attributes()
-        global FLAGS
-        FLAGS = self
+        return self
 
     def fill_attributes(self, obj=None):
         """
@@ -82,7 +78,8 @@ class BaseConfig(object):
 
     def _parse_arguments(self, args=None):
         self._args = self._parser.parse_args(args)
-        self._defined = True  # check `defined` flag before fill() in order to escape recursion calls
+        # check `defined` flag before fill() in order to escape recursion calls
+        self._defined = True
 
     def _get_resolvers_map(self):
         attrs_set = set(self._attrs)
@@ -91,9 +88,11 @@ class BaseConfig(object):
         return {
             a[resolve_cut:]: getattr(self, a)
             for a in dir(self)
-            if a.startswith('resolve_')
-               and a[resolve_cut:] in attrs_set
-               and callable(getattr(self, a))
+            if (
+                a.startswith('resolve_') and
+                a[resolve_cut:] in attrs_set and
+                callable(getattr(self, a))
+            )
         }
 
     def _call_definer(self, attr: str, typ, value, doc=''):
