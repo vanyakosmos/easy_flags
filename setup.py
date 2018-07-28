@@ -8,7 +8,7 @@ def readme():
 
 setup(
     name='easy_flags',
-    version='0.1.3',
+    version='0.1.4',
     packages=['easy_flags'],
     url='https://github.com/vaniakosmos/easy_flags',
     license='MIT',

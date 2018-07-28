@@ -22,7 +22,8 @@ class TestBaseConfig(TestCase):
     def setUp(self):
         self.conf = ExampleConfig()
         self.conf._setup_arguments()
-        # [] is crucial because w/o it argparse will try to catch sys.argv with test fixture arguments
+        # [] is crucial because w/o it argparse will try to catch
+        # sys.argv with test fixture arguments
         self.conf._parse_arguments([])
         self.conf.fill_attributes()
 

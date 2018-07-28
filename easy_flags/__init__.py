@@ -1,6 +1,6 @@
-from .base import BaseConfig
+from .base import BaseConfig, CONFIG
 
 
 __all__ = [
-    'BaseConfig',
+    'BaseConfig', 'CONFIG',
 ]

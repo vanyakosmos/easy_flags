@@ -1,4 +1,9 @@
 import argparse
+from typing import Optional
+
+
+# will point to the latest defined config
+CONFIG = None  # type: Optional[BaseConfig]
 
 
 class ConfigurationError(Exception):
@@ -30,10 +35,11 @@ class BaseConfig(object):
         Parse and define flags. This function should be called before using config object.
         """
         if self._defined:
-            return
+            return self
         self._setup_arguments()
         self._parse_arguments()
         self.fill_attributes()
+        globals()['CONFIG'] = self
         return self
 
     def fill_attributes(self, obj=None):
@@ -66,6 +72,7 @@ class BaseConfig(object):
             r = repr(value)
             print(f'{prefix}{key} : {r}')
         print('+ ' + '- ' * block_size)
+        return self
 
     def _setup_arguments(self):
         for attr in self._attrs:
@@ -179,9 +186,8 @@ class ExampleConfig(BaseConfig):
 
 
 def main():
-    conf = ExampleConfig(desc='Example config')
-    conf.define()
-    conf.print()
+    conf = ExampleConfig(desc='Example config').define().print()
+    print(conf is CONFIG)
 
 
 if __name__ == '__main__':
