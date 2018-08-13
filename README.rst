@@ -1,14 +1,11 @@
 easy_flags
 ==========
 
-The goal of this nano-project is to provide sane alternative for ``tensorflow.flags`` and ``argparse`` by adding some additional features that they currently lacks:
+The goal of this nano-project is to provide simple alternative for ``argparse`` by adding some new features:
 
 #. typechecking
-#. autocompletion
 #. configuration reusability
-#. full config print out
-
-Of course ``easy_flags`` doesn't depend on ``tensorflow`` and can be used w/o it.
+#. config print out
 
 
 Installation
