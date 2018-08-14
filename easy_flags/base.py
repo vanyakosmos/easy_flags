@@ -1,15 +1,13 @@
 import argparse
-from typing import Callable, Dict, Optional
+import sys
+from typing import Callable, Dict, List, Optional
 
+from easy_flags.errors import ConfigurationError
 from easy_flags.fields import Field, MethodField
 
 
 # will point to the latest defined config
 CONFIG = None  # type: Optional[SimpleConfig]
-
-
-class ConfigurationError(Exception):
-    pass
 
 
 class SimpleConfig(object):
@@ -43,6 +41,9 @@ class SimpleConfig(object):
         globals()['CONFIG'] = self
         self._defined = True
         return self
+
+    def validate(self):
+        pass
 
     def print(self, title=None, block_size=39, prefix='|  '):
         """
@@ -102,6 +103,7 @@ class SimpleConfig(object):
         Fill `obj` with defined attributes. If `obj` is `None` - fill `self`.
         This method should be called after arguments parsings.
         """
+        self.validate()
         if obj is None:
             obj = self
         for a in self._attrs:
@@ -188,6 +190,25 @@ BaseConfig = SimpleConfig
 
 
 class Config(SimpleConfig):
+    def validate(self):
+        errors = {}
+        for attr in self._attrs:
+            field = getattr(self.__class__, attr)  # type: Field
+            attr_errors = field.validate()
+            if attr_errors:
+                errors[attr] = attr_errors
+        if errors:
+            print(self._format_errors(errors), file=sys.stderr)
+            exit(1)
+
+    def _format_errors(self, errors: Dict[str, List[str]]):
+        lines = ['Validation errors:']
+        for attr, errs in errors.items():
+            lines.append('  Field ' + repr(attr))
+            for e in errs:
+                lines.append('    ' + e)
+        return '\n'.join(lines)
+
     def _get_attrs(self):
         attrs = []
         for attr in dir(self):
@@ -215,3 +236,10 @@ class Config(SimpleConfig):
                 if func:
                     res[attr] = func
         return res
+
+    def _parse_arguments(self, args=None):
+        super(Config, self)._parse_arguments(args)
+        for attr in self._attrs:
+            value = getattr(self._args, attr)
+            field = getattr(self.__class__, attr)  # type: Field
+            field.value = value

@@ -161,4 +161,11 @@ class TestConfig(TestBaseConfig):
         self.conf._setup_arguments()
         self.conf._parse_arguments([])
         self.conf._fill_attributes()
-        print(self.conf._parser.format_help())
+
+
+def main():
+    ExampleConfig().define().print()
+
+
+if __name__ == '__main__':
+    main()
