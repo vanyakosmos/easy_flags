@@ -1,22 +1,22 @@
 import argparse
-from typing import Optional
+from typing import Callable, Dict, Optional
+
+from easy_flags.fields import Field, MethodField
 
 
 # will point to the latest defined config
-CONFIG = None  # type: Optional[BaseConfig]
+CONFIG = None  # type: Optional[SimpleConfig]
 
 
 class ConfigurationError(Exception):
     pass
 
 
-class BaseConfig(object):
+class SimpleConfig(object):
     _desc = None
 
-    def __init__(self, desc=None, strict=False):
-        self._attrs = [a for a in dir(self)
-                       if not a.startswith('_')
-                       and not callable(getattr(self, a))]
+    def __init__(self, desc=None, strict=False, parser=None):
+        self._attrs = self._get_attrs()
         self._resolvers = self._get_resolvers_map()
         self._define_map = {
             str: self._define_str,
@@ -25,8 +25,9 @@ class BaseConfig(object):
             bool: self._define_bool,
         }
         conflict_handler = 'error' if strict else 'resolve'
-        self._parser = argparse.ArgumentParser(description=desc or self._desc,
-                                               conflict_handler=conflict_handler)
+        self._parser = parser or argparse.ArgumentParser(
+            description=desc or self._desc, conflict_handler=conflict_handler
+        )
         self._args = None
         self._defined = False
 
@@ -38,23 +39,10 @@ class BaseConfig(object):
             return self
         self._setup_arguments()
         self._parse_arguments()
-        self.fill_attributes()
+        self._fill_attributes()
         globals()['CONFIG'] = self
+        self._defined = True
         return self
-
-    def fill_attributes(self, obj=None):
-        """
-        Fill `obj` with defined attributes.
-        """
-        if obj is None:
-            obj = self
-        if not self._defined:
-            self.define()
-        for a in self._attrs:
-            value = getattr(self._args, a)
-            if a in self._resolvers:
-                value = self._resolvers[a](value)
-            setattr(obj, a, value)
 
     def print(self, title=None, block_size=39, prefix='|  '):
         """
@@ -74,51 +62,73 @@ class BaseConfig(object):
         print('+ ' + '- ' * block_size)
         return self
 
+    def format_doc(self, default, type_: type, doc: str):
+        res = '{: >5}, default: {}'.format(type_.__name__, repr(default))
+        if doc:
+            res += ' - ' + doc
+        return res
+
+    def _get_attrs(self):
+        return [
+            a for a in dir(self.__class__)
+            if not a.startswith('_') and not callable(getattr(self, a))
+        ]
+
+    def _get_resolvers_map(self) -> Dict[str, Callable]:
+        res = {}
+        for attr in self._attrs:
+            func_name = f'resolve_' + attr
+            func = getattr(self, func_name, None)
+            if func and callable(func):
+                res[attr] = func
+        return res
+
     def _setup_arguments(self):
+        """
+        Setup argument parser.
+        """
         for attr in self._attrs:
             value = getattr(self, attr)
-            typ = type(value)
-            if typ is tuple or typ is list:
+            if isinstance(value, (tuple, list)):
                 self._manage_tuple(attr, value)
             else:
-                self._call_definer(attr, typ, value)
+                self._call_definer(attr, value)
 
     def _parse_arguments(self, args=None):
         self._args = self._parser.parse_args(args)
-        # check `defined` flag before fill() in order to escape recursion calls
-        self._defined = True
 
-    def _get_resolvers_map(self):
-        attrs_set = set(self._attrs)
-        resolve_prefix = 'resolve_'
-        resolve_cut = len(resolve_prefix)
-        return {
-            a[resolve_cut:]: getattr(self, a)
-            for a in dir(self)
-            if (
-                a.startswith('resolve_') and
-                a[resolve_cut:] in attrs_set and
-                callable(getattr(self, a))
-            )
-        }
+    def _fill_attributes(self, obj=None):
+        """
+        Fill `obj` with defined attributes. If `obj` is `None` - fill `self`.
+        This method should be called after arguments parsings.
+        """
+        if obj is None:
+            obj = self
+        for a in self._attrs:
+            value = getattr(self._args, a)
+            if a in self._resolvers:
+                value = self._resolvers[a](value)
+            setattr(obj, a, value)
 
-    def _call_definer(self, attr: str, typ, value, doc=''):
+    def _call_definer(self, attr: str, value, doc='', typ=None):
+        typ = typ or type(value)
         definer = self._define_map.get(typ, None)
         if definer is None:
+            print(value, typ, definer)
             raise ConfigurationError("Unknown type for field '{0}'. "
                                      "Should be primitive type.".format(attr))
         definer(attr, value, doc)
 
     def _define_str(self, attr, value, doc=''):
-        doc = 'String field, default={}. {}'.format(repr(value), doc).strip()
+        # doc = 'String field, default={}. {}'.format(repr(value), doc).strip()
         self._define_arg(attr, str, value, doc)
 
     def _define_int(self, attr, value, doc=''):
-        doc = 'Integer field, default={}. {}'.format(repr(value), doc).strip()
+        # doc = 'Integer field, default={}. {}'.format(repr(value), doc).strip()
         self._define_arg(attr, int, value, doc)
 
     def _define_float(self, attr, value, doc=''):
-        doc = 'Float field, default={}. {}'.format(repr(value), doc).strip()
+        # doc = 'Float field, default={}. {}'.format(repr(value), doc).strip()
         self._define_arg(attr, float, value, doc)
 
     def _attr_name_tuple(self, attr):
@@ -135,7 +145,8 @@ class BaseConfig(object):
             return ('-' + attr, '--' + attr)
 
     def _define_bool(self, attr, value, doc=''):
-        doc = 'Boolean flag, default={}. {}'.format(repr(value), doc).strip()
+        # doc = 'Boolean flag, default={}. {}'.format(repr(value), doc).strip()
+        doc = self.format_doc(value, bool, doc)
         feature_parser = self._parser.add_mutually_exclusive_group(required=False)
         attr_name = self._attr_name_tuple(attr)
         feature_parser.add_argument(*attr_name, dest=attr, action='store_true', help=doc)
@@ -155,12 +166,13 @@ class BaseConfig(object):
             raise ConfigurationError(err_msg)
         if type(typ) is not type or type(doc) is not str:
             raise ConfigurationError(err_msg)
-        self._call_definer(attr, typ, value, doc)
+        self._call_definer(attr, value, doc, typ)
 
-    def _define_arg(self, attr: str, typ, value, doc='', action=None):
+    def _define_arg(self, attr: str, type_, value, doc='', action=None):
+        doc = self.format_doc(value, type_, doc)
         params = {
             'dest': attr,
-            'type': typ,
+            'type': type_,
             'default': value,
             'help': doc,
             'action': action
@@ -171,24 +183,35 @@ class BaseConfig(object):
         self._parser.add_argument(*attr_name, **params)
 
 
-class ExampleConfig(BaseConfig):
-    _desc = 'Description for parser. Will be redefined if `desc` is specified for config object.'
-    # specify type of resolver
-    a = 3  # type: str
-    cache = True
-    d = False
-    g = 5
-    c = 'spam', 'field with value and doc string'  # type: str
-    ddd = None, int, 'field with value, type and doc string'  # type: int
-
-    def resolve_a(self, value):
-        return str(value * 42)
+# backward compatibility
+BaseConfig = SimpleConfig
 
 
-def main():
-    conf = ExampleConfig(desc='Example config').define().print()
-    print(conf is CONFIG)
+class Config(SimpleConfig):
+    def _get_attrs(self):
+        attrs = []
+        for attr in dir(self):
+            value = getattr(self, attr)
+            if attr.startswith('_') or not isinstance(value, Field):
+                continue
+            attrs.append(attr)
+        return attrs
 
+    def _setup_arguments(self):
+        """
+        Setup argument parser.
+        """
+        for attr in self._attrs:
+            field = getattr(self, attr)  # type: Field
+            self._call_definer(attr, field.default, field.doc, field.type)
 
-if __name__ == '__main__':
-    main()
+    def _get_resolvers_map(self) -> Dict[str, Callable]:
+        res = {}
+        for attr in self._attrs:
+            field = getattr(self.__class__, attr)
+            if isinstance(field, MethodField):
+                field.method = field.method or 'resolve_' + attr
+                func = getattr(self, field.method, None)
+                if func:
+                    res[attr] = func
+        return res

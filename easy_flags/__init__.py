@@ -1,6 +1,8 @@
-from .base import BaseConfig, CONFIG
+from .base import CONFIG, Config, SimpleConfig
+from .fields import BoolField, Field, FloatField, IntField, MethodField, StringField
 
 
 __all__ = [
-    'BaseConfig', 'CONFIG',
+    'SimpleConfig', 'Config', 'CONFIG',
+    'BoolField', 'Field', 'FloatField', 'IntField', 'MethodField', 'StringField',
 ]
