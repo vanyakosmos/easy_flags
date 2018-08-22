@@ -59,7 +59,7 @@ class SimpleConfig(object):
             key = a.ljust(max_len)
             value = getattr(self, a)
             r = repr(value)
-            print(f'{prefix}{key} : {r}')
+            print('{}{} : {}'.format(prefix, key, r))
         print('+ ' + '- ' * block_size)
         return self
 
@@ -78,7 +78,7 @@ class SimpleConfig(object):
     def _get_resolvers_map(self) -> Dict[str, Callable]:
         res = {}
         for attr in self._attrs:
-            func_name = f'resolve_' + attr
+            func_name = 'resolve_' + attr
             func = getattr(self, func_name, None)
             if func and callable(func):
                 res[attr] = func
