@@ -3,9 +3,9 @@ easy_flags
 
 The goal of this nano-project is to provide simple alternative for ``argparse`` by adding some new features:
 
-#. typechecking
-#. configuration reusability
-#. config print out
+#. easy definition
+#. type checking (with static type checking tools)
+#. reusability
 
 
 Installation
@@ -19,75 +19,88 @@ Installation
 Basic example
 -------------
 
-configs.py
+foo.py
 
 .. code-block:: python
 
-    from easy_flags import BaseConfig
+    from easy_flags import SimpleConfig
 
-    # main config with model parameters
-    class ModelConfig(BaseConfig):
+    class MyConfig(SimpleConfig):
+        int_val = 4
+        bool_val = True
+        with_doc = 0.4, 'some docs'  # type: float
+        without_default = None, int, 'another docs'  # type: bool
+
+    if __name__ == '__main__':
+        # command line arguments will be parsed after ::define call
+        c = MyConfig().define().print()
+        print('bool_val:', c.bool_val)
+
+
+Run:
+
+.. code-block::
+
+    $ python foo.py
+
+    + - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    |  bool_val        : True
+    |  int_val         : 4
+    |  with_doc        : 0.4
+    |  without_default : None
+    + - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    bool_val: True
+
+    Process finished with exit code 0
+
+
+    $ python foo.py -h
+
+    usage: foo.py [-h] [--bool_val | --no-bool_val] [--int_val INT_VAL]
+                         [--with_doc WITH_DOC] [--without_default WITHOUT_DEFAULT]
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      --bool_val            bool, default: True
+      --no-bool_val
+      --int_val INT_VAL     int, default: 4
+      --with_doc WITH_DOC   float, default: 0.4 - some docs
+      --without_default WITHOUT_DEFAULT
+                            int, default: None - another docs
+
+
+Alternative definition
+----------------------
+
+.. code-block:: python
+
+    from easy_flags import Config, IntField, BoolField, FloatField
+
+    class MyConfig(Config):
+        int_val = IntField(4)
+        bool_val = BoolField(default=True)
+        with_doc = FloatField(0.4, 'some docs')
+        without_default = IntField(doc='another docs')
+
+
+Reusabillity
+------------
+
+.. code-block:: python
+
+    from easy_flags import Config
+
+    class ModelConfig(Config):
         layers = 4
-        dropout = 0.4, 'this is docstring for this field'  # type: float
-        leaky = True, 'use leaky relu'  # type: bool
+        time_steps = 256
+        cell_size = 256
+        dropout = 1.0
 
-    # extend model config with training flags
+    # same as model config + additional parameters
     class TrainingConfig(ModelConfig):
-        lr = 0.001, 'learning rate'  # type: float
-        e = 100, 'number of epochs'  # type: int
-
-    class PredictConfig(ModelConfig):
-        load_path = 'path/to/model/checkpoint'
-
-
-train.py
-
-.. code-block:: python
-
-    from configs import TrainingConfig
-
-    conf = TrainingConfig()  # instantiate config object
-
-    def train(epochs: int, lr: float, layers: int, dropout: float, leaky_relu: bool):
-        # or use `conf` directly inside function
-        ...
-
-    def main():
-        train(conf.e, conf.lr, conf.layers, conf.dropout, conf.leaky)
-
-    if __name__ == "__main__":
-        conf.define()  # read/parse flags from sys.argv and fill up `conf` with values
-        conf.print()  # pretty-print all flags and their values
-        main()
-
-.. code-block:: bash
-
-    python train.py --layers 2 --lr 0.1 -e 42 --no-leaky
-
-
-predict.py
-
-.. code-block:: python
-
-    from configs import PredictConfig
-
-    conf = PredictConfig()
-
-    def predict(load_path: str, layers: int):
-        ...
-
-    def main():
-        predict(conf.load_path, conf.layers)
-
-    if __name__ == "__main__":
-        conf.define()
-        conf.print()
-        main()
-
-.. code-block:: bash
-
-    python predict.py --layers 2 --load_path "not/default/path/to/model" --no-leaky
-
+        lr = 0.001
+        epochs = 10000
+        dropout = 0.9  # change parent arg
 
 
 Docstrings
@@ -167,29 +180,9 @@ Specify type for tuples
     conf.define()
 
 
-In example above pre-defined ``conf.lr`` is obviously not a float and some IDE/linters after typechecking will make a warning that they expected a float as argument for some function but got tuple instead. Fortunately we can help IDE by adding special comment with proper after-define type:
+In example above pre-defined ``conf.lr`` is obviously not a float and some static checkers after typec hecking will make a warning that they expected a float as argument for some function but got tuple instead. Fortunately we can help IDE by adding special comment with proper after-define type:
 
 .. code-block:: python
 
     class ExampleConfig(BaseConfig):
         lr = 0.001, 'learning rate'  # type: float
-
-
-
-Global FLAGS
-------------
-
-Globally available ``easy_flags.FLAGS`` is pointing to the latest defined config or to ``None`` if no config was defined. You can specify type after import:
-
-.. code-block:: python
-
-    from easy_flags import FLAGS
-    from configs import ExampleConfig
-
-    FLAGS: ExampleConfig = FLAGS
-
-
-.. code-block:: python
-
-    # or just import config object from script that defines it
-    from train import conf
